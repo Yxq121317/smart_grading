@@ -1,0 +1,28 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# 本地临时文件（截图、CDP 调试脚本、下载件）
+.tmp/
+
+# 编辑器 / 工具状态
+.idea/
+.superpowers/
+.vscode/
+
+# 本地文档：AI 约定、设计稿与实现计划，不随仓库发布
+CLAUDE.md
+docs/
+
+# 由 scripts/import_dataset.py 生成
+db/import_dataset.sql
+
+# 系统杂项
+.DS_Store
+Thumbs.db
+*.log

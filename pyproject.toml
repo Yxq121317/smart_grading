@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smart-grading"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.163.1",
+    "uvicorn[standard]==0.54.0",
+    "sqlalchemy[asyncio]==2.1.9",
+    "psycopg[binary,pool]==3.3.9",
+    "pydantic-settings==2.16.3",
+    "langgraph==1.2.22",
+    "langgraph-checkpoint-postgres==3.2.1",
+    "langchain-core==1.8.1",
+    "openai==3.52.0",
+    "langfuse==5.2.0",
+    "python-multipart==0.0.20",
+    "openpyxl==3.1.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.2.0",
+    "pytest-asyncio==1.5.0",
+    "httpx==0.28.1",
+    "ruff==0.17.5",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

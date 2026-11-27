@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>智能阅卷 · 教师复核台</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <noscript>
+      <p class="noscript">这个页面需要 JavaScript 才能查看题目和复核交互。</p>
+    </noscript>
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">阅</div>
+        <div>
+          <h1>智能阅卷</h1>
+          <p>论述类文本阅读 · 教师复核台</p>
+        </div>
+      </div>
+      <div class="controls">
+        <label class="pill">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+          <span>试卷</span><select id="exam-select" class="exam-select" aria-label="选择试卷"></select>
+        </label>
+        <span class="pill">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          <span>学生</span><select id="student-select" class="student-select" aria-label="选择学生"></select>
+        </span>
+        <button class="pill action" id="import-sheet" type="button" title="上传 CSV / Excel / JSON 答题卡">导入答卷</button>
+        <button class="pill ghost" id="download-template" type="button" title="下载当前试卷的答题卡模板">模板</button>
+        <input type="file" id="sheet-file" accept=".csv,.xlsx,.xlsm,.json" hidden />
+        <button class="pill demo" id="data-mode" type="button" title="查看数据来源">实时数据</button>
+        <button class="icon-btn" id="theme-toggle" type="button" aria-label="切换主题">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="data-status" id="data-status" hidden></div>
+
+    <div class="section-head">
+      <h2>班级概览</h2>
+      <p id="class-summary">正在加载...</p>
+    </div>
+
+    <section class="kpis" aria-label="班级概览指标">
+      <article class="kpi">
+        <p class="kpi-label">平均分</p>
+        <p class="kpi-value" id="kpi-average">—<span>/ —</span></p>
+        <p class="kpi-note" id="kpi-average-note">正在加载...</p>
+      </article>
+      <article class="kpi">
+        <p class="kpi-label">待复核</p>
+        <p class="kpi-value" id="pending-count">—<span>项</span></p>
+        <p class="kpi-note" id="pending-note">正在加载...</p>
+      </article>
+      <article class="kpi">
+        <p class="kpi-label">教师免改率</p>
+        <p class="kpi-value" id="kpi-no-change">—<span>%</span></p>
+        <p class="kpi-note" id="kpi-no-change-note">正在加载...</p>
+      </article>
+      <article class="kpi">
+        <p class="kpi-label">批改完成</p>
+        <p class="kpi-value" id="kpi-completion">—<span>/ —</span></p>
+        <p class="kpi-note good" id="kpi-completion-note">正在加载...</p>
+      </article>
+    </section>
+
+    <main class="workspace">
+      <section class="panel passage-panel" aria-labelledby="passage-title">
+        <div class="panel-head">
+          <h2 id="passage-title">阅读材料</h2>
+          <span class="meta">摘自《后真相时代》</span>
+        </div>
+        <div class="passage-wrap" id="passage-wrap">
+          <div class="passage" id="passage">
+            <p class="loading">正在加载阅读材料...</p>
+          </div>
+        </div>
+        <button class="link-btn" id="toggle-passage" type="button" aria-expanded="false">
+          <span>展开全文</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="divider"></div>
+        <div class="panel-head">
+          <h2>题目</h2>
+          <span class="meta" id="question-meta">—</span>
+        </div>
+        <div class="question-list" id="question-list" aria-label="题目列表"></div>
+      </section>
+
+      <section class="panel detail-panel" id="detail-panel" aria-live="polite"><div class="empty-state">正在加载...</div></section>
+    </main>
+
+    <section class="lower">
+      <section class="panel review-panel">
+        <div class="panel-head">
+          <h2>待复核</h2>
+          <span class="meta" id="review-meta">—</span>
+        </div>
+        <ul class="review-list" id="review-list"></ul>
+      </section>
+
+      <section class="panel errors-panel">
+        <div class="panel-head">
+          <h2>错因分布</h2>
+          <span class="meta" id="error-meta">—</span>
+        </div>
+        <div class="bars" id="error-bars" aria-label="错因分布条形图"><p class="empty-state">正在加载...</p></div>
+        <details class="table-view">
+          <summary>查看数据表</summary>
+          <table>
+            <thead>
+              <tr><th>错因</th><th>次数</th></tr>
+            </thead>
+            <tbody id="error-table-body"></tbody>
+          </table>
+        </details>
+      </section>
+    </section>
+
+    <footer class="footer">
+      <span id="footer-summary">数据来自 Mark 题库</span>
+      <span id="footer-student">—</span>
+    </footer>
+  </div>
+
+  <div class="tooltip" id="tooltip" role="status" aria-live="polite"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

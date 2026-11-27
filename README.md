@@ -1,92 +1,169 @@
-# Smart_grading
+# 智能阅卷与学情分析
 
+从试卷和参考答案出发，AI 先逐题批改，教师只复核没把握的部分，最后产出班级和个人的学情报告。
 
+当前仓库包含三部分：
 
-## Getting started
+- 高考语文论述类文本题库：21 个试卷组、69 道题，已导入 PostgreSQL 的 `Mark` 库。
+- 一个教师复核页：`app/static/index.html`、`styles.css`、`app.js`，通过 `/api/demo/dashboard` 读取题库、学生和批改结果。
+- 后端：FastAPI + LangGraph + PostgreSQL + DeepSeek + Langfuse，覆盖批改、人工复核、自然语言校准、报告和坏案例分析。
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## 技术栈
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- Python 3.12
+- FastAPI、SQLAlchemy 2.x async、psycopg 3
+- LangGraph 1.2.x，Postgres checkpointer
+- DeepSeek（OpenAI 兼容接口）
+- Langfuse 5.x
+- pytest、ruff
 
-## Add your files
+## 环境要求
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+- Python 3.12 和 `.venv`
+- Docker 里的 PostgreSQL：容器 `agent_test-postgres`，开发库 `Mark`，测试库 `Mark_test`
+- 本地 Langfuse：`http://localhost:3000`
+- `.env` 里配置 `API_KEY`、`BASE_URL`、`MODEL_NAME`、`LANGFUSE_*`、`MARK_DATABASE_URL`
+- `.env` 已在 `.gitignore` 中，不要提交
 
+## 初始化
+
+```powershell
+.venv\Scripts\python.exe -m ensurepip --upgrade
+.venv\Scripts\python.exe -m pip install -e ".[dev]"
+
+# 题库：建表、导入 docx、填默认分值
+.venv\Scripts\python.exe scripts\import_dataset.py --apply
+.venv\Scripts\python.exe scripts\init_db.py
+.venv\Scripts\python.exe scripts\init_scores.py
+
+# 可选：生成一个班 10 份模拟答卷
+.venv\Scripts\python.exe scripts\seed_synthetic.py --exam-code 2023-新高考Ⅰ卷
 ```
-cd existing_repo
-git remote add origin http://gitlab.example.com/Yxq1213/smart_grading.git
-git branch -M main
-git push -uf origin main
+
+`init_db.py` 会执行 `db/schema.sql` 并写入 9 个错因分类。`import_dataset.py` 只处理题库，不会动业务表。
+
+测试库：
+
+```powershell
+docker exec agent_test-postgres createdb -U postgres Mark_test
 ```
 
-## Integrate with your tools
+如果已经存在，命令报错可以忽略。
 
-- [ ] [Set up project integrations](http://gitlab.example.com/Yxq1213/smart_grading/-/settings/integrations)
+## 启动
 
-## Collaborate with your team
+```powershell
+.venv\Scripts\python.exe scripts\run_server.py --port 8000
+```
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+Windows 上不要直接用 `python -m uvicorn`：uvicorn 0.54 默认用 ProactorEventLoop，psycopg async 会启动失败。`scripts\run_server.py` 已经指定 SelectorEventLoop，并且不支持 `--reload`。
 
-## Test and Deploy
+- 教师复核页：`http://localhost:8000/`，读取 `/api/demo/dashboard`
+- OpenAPI 文档：`http://localhost:8000/docs`
+- 健康检查：`http://localhost:8000/health`
 
-Use the built-in continuous integration in GitLab.
+生产环境不要用 `--reload`，也不要把服务直接暴露到公网。当前没有登录和权限。
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+## API 流程
 
-***
+```powershell
+# 1. 看试卷
+Invoke-RestMethod http://localhost:8000/api/exams
 
-# Editing this README
+# 2. 创建答卷
+$body = @{
+  student_id = 1
+  answers = @(
+    @{ question_id = 1; selected_options = @("C") },
+    @{ question_id = 4; answer_text = "只答出第一点" }
+  )
+} | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/exams/1/submissions `
+  -ContentType "application/json" -Body $body
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
+# 3. 启动批改
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/submissions/1/grade
 
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+# 4. 查批改结果和复核队列
+Invoke-RestMethod http://localhost:8000/api/grading-runs/1
 
-## Name
-Choose a self-explaining name for your project.
+# 5. 教师复核
+$review = @{
+  corrections = @(
+    @{ result_id = 1; final_score = 5; instruction = "第三点同义表达给分" }
+  )
+} | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/grading-runs/1/review `
+  -ContentType "application/json" -Body $review
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+# 6. 自然语言校准，可选全量重批
+$calibrate = @{
+  question_id = 4
+  instruction = "第三点只要提到倾向性标题就给分"
+  re_grade_all = $false
+} | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/exams/1/calibrate `
+  -ContentType "application/json" -Body $calibrate
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+# 7. 报告
+Invoke-RestMethod "http://localhost:8000/api/classes/1/report?exam_id=1"
+Invoke-RestMethod "http://localhost:8000/api/students/1/report?exam_id=1"
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+# 8. 坏案例
+Invoke-RestMethod "http://localhost:8000/api/dev/bad-cases?exam_id=1"
+```
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+主要接口：
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+| 方法 | 路径 | 作用 |
+|---|---|---|
+| GET | `/api/exams` | 试卷列表 |
+| GET | `/api/exams/{id}` | 试卷、材料、题目、当前细则 |
+| POST | `/api/exams/{id}/submissions` | 创建答卷 |
+| GET | `/api/submissions/{id}` | 答卷和答案 |
+| POST | `/api/submissions/{id}/grade` | 启动批改 |
+| GET | `/api/grading-runs/{id}` | 批改状态和逐题结果 |
+| POST | `/api/grading-runs/{id}/review` | 教师复核 |
+| POST | `/api/exams/{id}/calibrate` | 自然语言校准 |
+| GET | `/api/questions/{id}/rubrics` | 细则版本列表 |
+| GET | `/api/classes/{id}/report?exam_id=` | 班级报告 |
+| GET | `/api/students/{id}/report?exam_id=` | 学生报告 |
+| GET | `/api/demo/dashboard?exam_code=` | 教师复核页数据 |
+| POST | `/api/dev/seed-synthetic` | 生成模拟班级和答卷 |
+| GET | `/api/dev/bad-cases?exam_id=` | 低置信度和教师改分案例 |
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+## 测试和评测
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```powershell
+.venv\Scripts\python.exe -m pytest -q
+.venv\Scripts\python.exe -m ruff check .
+.venv\Scripts\python.exe scripts\evaluate.py --fake
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+- 单元测试和集成测试使用 `Mark_test`，LLM 用假客户端，不调用真实 API。
+- `scripts/evaluate.py --fake` 用黄金样本的期望分跑指标，验证脚本本身。
+- `scripts/evaluate.py` 不带 `--fake` 会调真实模型，产生 API 费用。
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+## 数据模型
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+- `exams`、`passages`、`questions`：题库。
+- `classes`、`students`、`submissions`、`student_answers`：班级、学生、答卷。
+- `rubrics`：评分细则版本，同一题只有一个 `active=true`。
+- `grading_runs`、`grading_results`：批改运行和逐题结果。
+- `teacher_corrections`：教师修正，数据飞轮的原始记录。
+- `calibration_logs`：自然语言校准记录。
+- `error_categories`：九个错因分类。
+- `reports`：班级和学生报告快照。
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+同一份答卷可以有多个批改运行。submission、报告和接口的当前结果取最新 `status='completed'` 的运行，历史运行保留用于对比。
 
-## License
-For open source projects, say how it is licensed.
+## 已知限制
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+- 不做 OCR、扫描件和手写识别，只处理文本答案。
+- 不做 LoRA 微调和 vLLM 部署，本机没有 GPU。
+- 没有登录、权限和多租户，只能本地使用。
+- 后台任务用 FastAPI `BackgroundTasks`，进程重启会丢；`awaiting_review` 的 LangGraph checkpoint 可以恢复。
+- 题库没有官方逐题分值，当前默认选择题 3 分、主观题 6 分。
+- 模拟答卷和黄金样本只能验证链路和格式，不能证明真实场景的 95.6% 一致率或 97.1% 免改率。
+- `.env` 里的本地数据库密码按机器配置，换机器需要重新填。
+- 页面上的“开始批改”会调用 DeepSeek；`.env` 里没有有效 `API_KEY` 时，批改会以 401 失败。

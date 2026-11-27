@@ -1,0 +1,10 @@
+{"question_id": 1, "selected_options": ["C"], "student_answer": "", "expected_score": 3, "expected_error_type": null}
+{"question_id": 1, "selected_options": ["A"], "student_answer": "", "expected_score": 0, "expected_error_type": "mcq_wrong"}
+{"question_id": 2, "selected_options": ["D"], "student_answer": "", "expected_score": 3, "expected_error_type": null}
+{"question_id": 2, "selected_options": ["B"], "student_answer": "", "expected_score": 0, "expected_error_type": "mcq_wrong"}
+{"question_id": 3, "selected_options": ["A"], "student_answer": "", "expected_score": 3, "expected_error_type": null}
+{"question_id": 4, "selected_options": [], "student_answer": "①《独立报》通过片面的事实和数据，称藜麦价格的上涨使玻利维亚人吃不起藜麦了；②《纽约时报》直接援引他人研究，得出藜麦种植区的儿童营养不良率正在上升的结论；③《卫报》和《独立报》使用具有明显倾向性的标题强调藜麦价格上涨对藜麦种植者造成的伤害。", "expected_score": 6, "expected_error_type": null}
+{"question_id": 4, "selected_options": [], "student_answer": "《独立报》用片面的事实和数据，说藜麦价格上涨让玻利维亚人吃不起。", "expected_score": 4, "expected_error_type": "incomplete_summary"}
+{"question_id": 4, "selected_options": [], "student_answer": "", "expected_score": 0, "expected_error_type": "blank"}
+{"question_id": 5, "selected_options": [], "student_answer": "作者引用经济学家的调查数据，还去秘鲁实地考察。", "expected_score": 4, "expected_error_type": "incomplete_summary"}
+{"question_id": 5, "selected_options": [], "student_answer": "我认为这篇文章写的是美食文化。", "expected_score": 0, "expected_error_type": "off_topic"}
